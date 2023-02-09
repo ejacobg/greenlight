@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 )
 
 func (app *application) readIDParam(r *http.Request) (int64, error) {
@@ -42,7 +43,14 @@ func (app *application) writeJSON(w http.ResponseWriter, status int, data envelo
 }
 
 func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst interface{}) error {
-	err := json.NewDecoder(r.Body).Decode(dst)
+	// Request bodies can be a max of 1MB.
+	maxBytes := 1_048_576
+	r.Body = http.MaxBytesReader(w, r.Body, int64(maxBytes))
+
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+
+	err := dec.Decode(dst)
 	if err != nil {
 		// errors.As() requires pointers to the tested type.
 		var syntaxError *json.SyntaxError
@@ -70,6 +78,17 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 		case errors.Is(err, io.EOF):
 			return errors.New("body must not be empty")
 
+		// If DisallowUnknownFields() was set, then an error will be returned when an unknown field is detected.
+		// This error may receive its own type in the future: https://github.com/golang/go/issues/29035.
+		case strings.HasPrefix(err.Error(), "json: unknown field "):
+			fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
+			return fmt.Errorf("body contains unknown key %s", fieldName)
+
+		// If the request body is too large, then the following error will be returned.
+		// This error may receive its own type in the future: https://github.com/golang/go/issues/30715.
+		case err.Error() == "http: request body too large":
+			return fmt.Errorf("body must not be larger than %d bytes", maxBytes)
+
 		// A json.InvalidUnmarshalError error will be returned if we pass a nil pointer to Decode().
 		// Panicking is the appropriate response for this situation.
 		case errors.As(err, &invalidUnmarshalError):
@@ -80,5 +99,13 @@ func (app *application) readJSON(w http.ResponseWriter, r *http.Request, dst int
 			return err
 		}
 	}
+
+	// Check if more than one JSON object was sent.
+	// The empty struct is weird, don't worry about this line too much.
+	err = dec.Decode(&struct{}{})
+	if err != io.EOF {
+		return errors.New("body must contain only a single JSON value")
+	}
+
 	return nil
 }
