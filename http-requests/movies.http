@@ -1,4 +1,40 @@
 POST http://localhost:4000/v1/movies
+Content-Type: application/xml
+
+<?xml version="1.0" encoding="UTF-8"?><note><to>Alex</to></note>
+
+###
+
+POST http://localhost:4000/v1/movies
+Content-Type: application/json
+
+{
+  "title": "Moana",
+}
+
+###
+
+POST http://localhost:4000/v1/movies
+Content-Type: application/json
+
+["foo", "bar"]
+
+###
+
+POST http://localhost:4000/v1/movies
+Content-Type: application/json
+
+{
+  "title": 123
+}
+
+###
+
+POST http://localhost:4000/v1/movies
+
+###
+
+POST http://localhost:4000/v1/movies
 Content-Type: application/json
 
 {
