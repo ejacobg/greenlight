@@ -1,3 +1,43 @@
+# curl -i -d '{"title":"","year":1000,"runtime":"-123 mins","genres":["sci-fi","sci-fi"]}' localhost:4000/v1/movies
+POST localhost:4000/v1/movies
+Content-Type: application/x-www-form-urlencoded
+
+{"title":"","year":1000,"runtime":"-123 mins","genres":["sci-fi","sci-fi"]}
+
+###
+
+# curl -i -d '{"title":"Moana","year":2016,"runtime":"107 mins","genres":["animation","adventure"]}' localhost:4000/v1/movies
+POST localhost:4000/v1/movies
+Content-Type: application/x-www-form-urlencoded
+
+{"title":"Moana","year":2016,"runtime":"107 mins","genres":["animation","adventure"]}
+
+###
+
+# curl -d '{"title": "Moana", "runtime": "107 mins"}' localhost:4000/v1/movies
+POST localhost:4000/v1/movies
+Content-Type: application/x-www-form-urlencoded
+
+{"title": "Moana", "runtime": "107 mins"}
+
+###
+
+# curl -d '{"title": "Moana", "runtime": 107}' localhost:4000/v1/movies
+POST localhost:4000/v1/movies
+Content-Type: application/x-www-form-urlencoded
+
+{"title": "Moana", "runtime": 107}
+
+###
+
+# curl -d '{"title": "Moana", "runtime": "107 minutes"}' localhost:4000/v1/movies
+POST localhost:4000/v1/movies
+Content-Type: application/x-www-form-urlencoded
+
+{"title": "Moana", "runtime": "107 minutes"}
+
+###
+
 # curl -d @/tmp/largefile.json localhost:4000/v1/movies
 POST localhost:4000/v1/movies
 Content-Type: application/x-www-form-urlencoded
