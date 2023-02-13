@@ -1,0 +1,1 @@
+CREATE ROLE greenlight WITH LOGIN PASSWORD '<password>';
