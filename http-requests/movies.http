@@ -1,3 +1,13 @@
+# curl -i localhost:4000/v1/movies/2
+GET localhost:4000/v1/movies/2
+
+###
+
+# curl -i localhost:4000/v1/movies/42
+GET localhost:4000/v1/movies/42
+
+###
+
 # curl -d '{"title":"Black Panther","year":2018,"runtime":"134 mins","genres":["action","adventure"]}' localhost:4000/v1/movies
 POST localhost:4000/v1/movies
 Content-Type: application/x-www-form-urlencoded
