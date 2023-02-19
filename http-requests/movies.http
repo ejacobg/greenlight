@@ -1,3 +1,5 @@
+# xargs -I % -P8 curl -X PATCH -d '{"runtime": "97 mins"}' "localhost:4000/v1/movies/4" < <(printf '%s\n' {1..8})
+
 # curl -X PATCH -d '{"title": null, "year": null}' localhost:4000/v1/movies/4
 PATCH localhost:4000/v1/movies/4
 Content-Type: application/x-www-form-urlencoded
