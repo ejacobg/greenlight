@@ -1,6 +1,7 @@
 package data
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"github.com/ejacobg/greenlight/internal/validator"
@@ -45,8 +46,11 @@ RETURNING id, created_at, version`
 	// This slice technically isn't needed, but helps make clear what each placeholder value represents.
 	args := []interface{}{movie.Title, movie.Year, movie.Runtime, pq.Array(movie.Genres)}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
 	// Write the returned values back into the Movie object.
-	return m.DB.QueryRow(query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
+	return m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.ID, &movie.CreatedAt, &movie.Version)
 }
 
 func (m MovieModel) Get(id int64) (*Movie, error) {
@@ -63,7 +67,13 @@ WHERE id = $1`
 
 	var movie Movie
 
-	err := m.DB.QueryRow(query, id).Scan(
+	// This query should take at most 3 seconds.
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+
+	// Cancelling with defer is common after setting a timeout.
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, id).Scan(
 		&movie.ID,
 		&movie.CreatedAt,
 		&movie.Title,
@@ -102,7 +112,10 @@ RETURNING version`
 		movie.Version,
 	}
 
-	err := m.DB.QueryRow(query, args...).Scan(&movie.Version)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	err := m.DB.QueryRowContext(ctx, query, args...).Scan(&movie.Version)
 	if err != nil {
 		switch {
 		// If no rows were updated, then there must have been a version mismatch.
@@ -125,7 +138,10 @@ func (m MovieModel) Delete(id int64) error {
 DELETE FROM movies
 WHERE id = $1`
 
-	result, err := m.DB.Exec(query, id)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	result, err := m.DB.ExecContext(ctx, query, id)
 	if err != nil {
 		return err
 	}
