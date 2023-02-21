@@ -1,3 +1,13 @@
+# curl "localhost:4000/v1/movies?page=-1&page_size=-1&sort=foo"
+GET localhost:4000/v1/movies?page=-1&page_size=-1&sort=foo
+
+###
+
+# curl "localhost:4000/v1/movies?page=abc&page_size=abc"
+GET localhost:4000/v1/movies?page=abc&page_size=abc
+
+###
+
 # curl "localhost:4000/v1/movies?title=godfather&genres=crime,drama&page=1&page_size=5&sort=year"
 GET localhost:4000/v1/movies?title=godfather&genres=crime,drama&page=1&page_size=5&sort=year
 
