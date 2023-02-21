@@ -1,3 +1,13 @@
+# curl "localhost:4000/v1/movies?title=godfather&genres=crime,drama&page=1&page_size=5&sort=year"
+GET localhost:4000/v1/movies?title=godfather&genres=crime,drama&page=1&page_size=5&sort=year
+
+###
+
+# curl localhost:4000/v1/movies
+GET localhost:4000/v1/movies
+
+###
+
 # xargs -I % -P8 curl -X PATCH -d '{"runtime": "97 mins"}' "localhost:4000/v1/movies/4" < <(printf '%s\n' {1..8})
 
 # curl -X PATCH -d '{"title": null, "year": null}' localhost:4000/v1/movies/4
