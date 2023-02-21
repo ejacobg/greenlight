@@ -96,20 +96,25 @@ WHERE id = $1`
 	return &movie, nil
 }
 
-func (m MovieModel) GetAll(title string, genres []string, filters Filters) (movies []*Movie, err error) {
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
 	query := `
 SELECT id, created_at, title, year, runtime, genres, version
 FROM movies
+WHERE (LOWER(title) = LOWER($1) OR $1 = '')
+AND (genres @> $2 OR $2 = '{}')
 ORDER BY id`
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	rows, err := m.DB.QueryContext(ctx, query)
+	rows, err := m.DB.QueryContext(ctx, query, title, pq.Array(genres))
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
+
+	// Instantiate an empty (rather than nil) slice so that the returned JSON will always be an array (instead of null).
+	movies := []*Movie{}
 
 	// Use Next() to iterate through each returned row.
 	for rows.Next() {
