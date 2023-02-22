@@ -97,9 +97,9 @@ WHERE id = $1`
 	return &movie, nil
 }
 
-func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, error) {
+func (m MovieModel) GetAll(title string, genres []string, filters Filters) ([]*Movie, Metadata, error) {
 	query := fmt.Sprintf(`
-SELECT id, created_at, title, year, runtime, genres, version
+SELECT count(*) OVER(), id, created_at, title, year, runtime, genres, version
 FROM movies
 WHERE (to_tsvector('simple', title) @@ plainto_tsquery('simple', $1) OR $1 = '')
 AND (genres @> $2 OR $2 = '{}')
@@ -113,18 +113,20 @@ LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
 
 	rows, err := m.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 	defer rows.Close()
 
 	// Instantiate an empty (rather than nil) slice so that the returned JSON will always be an array (instead of null).
 	movies := []*Movie{}
+	totalRecords := 0
 
 	// Use Next() to iterate through each returned row.
 	for rows.Next() {
 		var movie Movie
 
 		err := rows.Scan(
+			&totalRecords, // Obtain the value returned by the window function (is the same for all rows).
 			&movie.ID,
 			&movie.CreatedAt,
 			&movie.Title,
@@ -135,17 +137,19 @@ LIMIT $3 OFFSET $4`, filters.sortColumn(), filters.sortDirection())
 		)
 
 		if err != nil {
-			return nil, err
+			return nil, Metadata{}, err
 		}
 
 		movies = append(movies, &movie)
 	}
 
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return nil, Metadata{}, err
 	}
 
-	return movies, nil
+	metadata := calculateMetadata(totalRecords, filters.Page, filters.PageSize)
+
+	return movies, metadata, nil
 }
 
 func (m MovieModel) Update(movie *Movie) error {

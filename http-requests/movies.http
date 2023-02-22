@@ -1,3 +1,18 @@
+# curl "localhost:4000/v1/movies?page=1&page_size=2"
+GET localhost:4000/v1/movies?page=1&page_size=2
+
+###
+
+# curl localhost:4000/v1/movies?genres=adventure
+GET localhost:4000/v1/movies?genres=adventure
+
+###
+
+# curl localhost:4000/v1/movies?page=100
+GET localhost:4000/v1/movies?page=100
+
+###
+
 # curl "localhost:4000/v1/movies?page_size=2"
 GET localhost:4000/v1/movies?page_size=2
 

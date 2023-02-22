@@ -2,6 +2,7 @@ package data
 
 import (
 	"github.com/ejacobg/greenlight/internal/validator"
+	"math"
 	"strings"
 )
 
@@ -46,4 +47,28 @@ func (f Filters) limit() int {
 }
 func (f Filters) offset() int {
 	return (f.Page - 1) * f.PageSize
+}
+
+// Metadata holds extra fields that will be returned for paginated requests.
+type Metadata struct {
+	CurrentPage  int `json:"current_page,omitempty"`
+	PageSize     int `json:"page_size,omitempty"`
+	FirstPage    int `json:"first_page,omitempty"`
+	LastPage     int `json:"last_page,omitempty"`
+	TotalRecords int `json:"total_records,omitempty"`
+}
+
+func calculateMetadata(totalRecords, page, pageSize int) Metadata {
+	if totalRecords == 0 {
+		// Note that we return an empty Metadata struct if there are no records.
+		return Metadata{}
+	}
+	return Metadata{
+		CurrentPage: page,
+		PageSize:    pageSize,
+		FirstPage:   1,
+		// The number of pages is the total number of records divided by the page size, rounded up.
+		LastPage:     int(math.Ceil(float64(totalRecords) / float64(pageSize))),
+		TotalRecords: totalRecords,
+	}
 }
