@@ -3,7 +3,10 @@ package main
 import (
 	"fmt"
 	"golang.org/x/time/rate"
+	"net"
 	"net/http"
+	"sync"
+	"time"
 )
 
 func (app *application) recoverPanic(next http.Handler) http.Handler {
@@ -23,16 +26,59 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 }
 
 func (app *application) rateLimit(next http.Handler) http.Handler {
-	// Create a new rate limiter with a refill rate of 2 events/tokens per second, with a maximum capacity of 4 events/tokens.
-	limiter := rate.NewLimiter(2, 4)
+	type client struct {
+		limiter *rate.Limiter
+		// Add a timestamp to each map entry to determine if it needs to be deleted.
+		lastSeen time.Time
+	}
+	var (
+		mu      sync.Mutex
+		clients = make(map[string]*client) // Not sure why we store pointers?
+	)
 
-	// All calls to this function will pull from the above rate limiter.
+	// Remove old entries every minute.
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+
+			mu.Lock()
+			// If a client hasn't been seen for more than 3 minutes, then remove them from the map.
+			for ip, client := range clients {
+				if time.Since(client.lastSeen) > 3*time.Minute {
+					delete(clients, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check if there are enough tokens to perform an event, returning a 429 Too Many Requests response if there aren't.
-		if !limiter.Allow() {
+		// Extract the client's IP address from the request.
+		ip, _, err := net.SplitHostPort(r.RemoteAddr)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+
+		mu.Lock()
+		// Find the IP's rate limiter, creating one if it doesn't exist.
+		if _, found := clients[ip]; !found {
+			clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
+		}
+
+		// Update the last seen time for the client.
+		clients[ip].lastSeen = time.Now()
+
+		// Determine if there are enough tokens to make a request.
+		if !clients[ip].limiter.Allow() {
+			// Remove our access before leaving.
+			mu.Unlock()
 			app.rateLimitExceededResponse(w, r)
 			return
 		}
+
+		// Manually unlock (as opposed to using defer) so that other goroutines don't have to wait until the response cycle is finished to be able to read.
+		mu.Unlock()
 		next.ServeHTTP(w, r)
 	})
 }
