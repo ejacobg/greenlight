@@ -26,6 +26,11 @@ func (app *application) recoverPanic(next http.Handler) http.Handler {
 }
 
 func (app *application) rateLimit(next http.Handler) http.Handler {
+	// Ignore this middleware if rate limiting is disabled.
+	if !app.config.limiter.enabled {
+		return next
+	}
+
 	type client struct {
 		limiter *rate.Limiter
 		// Add a timestamp to each map entry to determine if it needs to be deleted.
@@ -63,7 +68,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		mu.Lock()
 		// Find the IP's rate limiter, creating one if it doesn't exist.
 		if _, found := clients[ip]; !found {
-			clients[ip] = &client{limiter: rate.NewLimiter(2, 4)}
+			clients[ip] = &client{limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst)}
 		}
 
 		// Update the last seen time for the client.
