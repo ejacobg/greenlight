@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -19,22 +21,28 @@ func (app *application) serve() error {
 		WriteTimeout: 30 * time.Second,
 	}
 
+	// Channel used to receive the error returned by the Shutdown() method.
+	shutdownError := make(chan error)
+
 	// Spin up a goroutine that will just listen for OS signals.
 	// This goroutine will intercept the SIGINT and SIGTERM signals, logging and shutting down the app if found.
 	go func() {
+		// Listen and intercept the given signals.
 		quit := make(chan os.Signal, 1)
-
-		// Listen for the given signals.
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-		// This line will block until a signal is received.
-		s := <-quit
+		s := <-quit // This line will block until a signal is received.
 
 		// Log the caught signal and exit.
-		app.logger.PrintInfo("caught signal", map[string]string{
+		app.logger.PrintInfo("shutting down server", map[string]string{
 			"signal": s.String(),
 		})
-		os.Exit(0)
+
+		// Allow any in-flight requests 5 seconds to finish their work before shutting them down.
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Block while waiting for the server to shut down.
+		shutdownError <- srv.Shutdown(ctx)
 	}()
 
 	app.logger.PrintInfo("starting server", map[string]string{
@@ -42,5 +50,20 @@ func (app *application) serve() error {
 		"env":  app.config.env,
 	})
 
-	return srv.ListenAndServe()
+	// Calling Shutdown() will return http.ErrServerClosed. If the server is closed for another reason, return the error.
+	if err := srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+
+	// Otherwise, wait for the shutdown to complete. Return any errors.
+	if err := <-shutdownError; err != nil {
+		return err
+	}
+
+	// Write a log indicating successful shutdown.
+	app.logger.PrintInfo("stopped server", map[string]string{
+		"addr": srv.Addr,
+	})
+
+	return nil
 }
