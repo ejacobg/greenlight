@@ -1,0 +1,23 @@
+# curl -i -d '{"name": "Alice Smith", "email": "alice@example.com", "password": "pa55word"}' localhost:4000/v1/users
+POST localhost:4000/v1/users
+Content-Type: application/x-www-form-urlencoded
+
+{"name": "Alice Smith", "email": "alice@example.com", "password": "pa55word"}
+
+###
+
+# curl -d '{"name": "", "email": "bob@invalid.", "password": "pass"}' localhost:4000/v1/users
+POST localhost:4000/v1/users
+Content-Type: application/x-www-form-urlencoded
+
+{"name": "", "email": "bob@invalid.", "password": "pass"}
+
+###
+
+# curl -i -d '{"name": "Alice Jones", "email": "alice@example.com", "password": "pa55word"}' localhost:4000/v1/users
+POST localhost:4000/v1/users
+Content-Type: application/x-www-form-urlencoded
+
+{"name": "Alice Jones", "email": "alice@example.com", "password": "pa55word"}
+
+###
