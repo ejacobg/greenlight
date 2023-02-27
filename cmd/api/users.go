@@ -53,13 +53,17 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Send an email if the user was successfully created.
-	err = app.mailer.Send(user.Email, "user_welcome.go.html", user)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
+	app.background(func() {
+		err = app.mailer.Send(user.Email, "user_welcome.tmpl", user)
+		if err != nil {
+			// If an error occurs, log it rather than returning an error response.
+			app.logger.PrintError(err, nil)
+		}
+	})
 
-	err = app.writeJSON(w, http.StatusCreated, envelope{"user": user}, nil)
+	// Note that we are returning 202 Accepted instead of 201 Created.
+	// "Accepted" means that a task has begun processing, but has not been completed.
+	err = app.writeJSON(w, http.StatusAccepted, envelope{"user": user}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}
