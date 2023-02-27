@@ -6,6 +6,7 @@ import (
 	"flag"
 	"github.com/ejacobg/greenlight/internal/data"
 	"github.com/ejacobg/greenlight/internal/jsonlog"
+	"github.com/ejacobg/greenlight/internal/mailer"
 	"os"
 	"time"
 
@@ -29,12 +30,21 @@ type config struct {
 		burst   int     // Maximum number of simultaneous requests (bucket capacity)
 		enabled bool    // Allow enabling/disabling of rate limiter
 	}
+	// Mailtrap inbox credentials.
+	smtp struct {
+		host     string
+		port     int
+		username string
+		password string
+		sender   string
+	}
 }
 
 type application struct {
 	config config
 	logger *jsonlog.Logger
 	models data.Models
+	mailer mailer.Mailer
 }
 
 func main() {
@@ -46,13 +56,22 @@ func main() {
 	// Update the default value with your password.
 	flag.StringVar(&cfg.db.dsn, "db-dsn", os.Getenv("GREENLIGHT_DB_DSN"), "PostgreSQL DSN")
 
+	// Database configuration
 	flag.IntVar(&cfg.db.maxOpenConns, "db-max-open-conns", 25, "PostgreSQL max open connections")
 	flag.IntVar(&cfg.db.maxIdleConns, "db-max-idle-conns", 25, "PostgreSQL max idle connections")
 	flag.StringVar(&cfg.db.maxIdleTime, "db-max-idle-time", "15m", "PostgreSQL max connection idle time")
 
+	// Rate limiter configuration
 	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 	flag.BoolVar(&cfg.limiter.enabled, "limiter-enabled", true, "Enable rate limiter") // Rate limiter is on by default.
+
+	// Mailtrap configuration
+	flag.StringVar(&cfg.smtp.host, "smtp-host", "", "SMTP host")
+	flag.IntVar(&cfg.smtp.port, "smtp-port", 0, "SMTP port")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", "", "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", "", "SMTP password")
+	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "", "SMTP sender")
 
 	flag.Parse()
 
@@ -70,6 +89,7 @@ func main() {
 		config: cfg,
 		logger: logger,
 		models: data.NewModels(db),
+		mailer: mailer.New(cfg.smtp.host, cfg.smtp.port, cfg.smtp.username, cfg.smtp.password, cfg.smtp.sender),
 	}
 
 	if err = app.serve(); err != nil {

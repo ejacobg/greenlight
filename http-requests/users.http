@@ -1,3 +1,11 @@
+# curl -d '{"name": "Bob Jones", "email": "bob@example.com", "password": "pa55word"}' localhost:4000/v1/users
+POST localhost:4000/v1/users
+Content-Type: application/x-www-form-urlencoded
+
+{"name": "Bob Jones", "email": "bob@example.com", "password": "pa55word"}
+
+###
+
 # curl -i -d '{"name": "Alice Smith", "email": "alice@example.com", "password": "pa55word"}' localhost:4000/v1/users
 POST localhost:4000/v1/users
 Content-Type: application/x-www-form-urlencoded
