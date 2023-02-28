@@ -42,7 +42,22 @@ func (app *application) serve() error {
 		defer cancel()
 
 		// Block while waiting for the server to shut down.
-		shutdownError <- srv.Shutdown(ctx)
+		err := srv.Shutdown(ctx)
+		if err != nil {
+			// Report any shutdown errors we come across.
+			// Note that if we find an error, we will no longer wait for the background tasks.
+			shutdownError <- err
+		}
+
+		// Once the server has shut down, wait for any remaining background tasks.
+		app.logger.PrintInfo("completing background tasks", map[string]string{
+			"addr": srv.Addr,
+		})
+
+		app.wg.Wait()
+
+		// Once all tasks have finish, continue with the shutdown.
+		shutdownError <- nil
 	}()
 
 	app.logger.PrintInfo("starting server", map[string]string{
