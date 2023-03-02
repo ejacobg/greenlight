@@ -1,3 +1,27 @@
+# curl -X PUT -d '{"token": "invalid"}' localhost:4000/v1/users/activated
+PUT localhost:4000/v1/users/activated
+Content-Type: application/x-www-form-urlencoded
+
+{"token": "invalid"}
+
+###
+
+# curl -X PUT -d '{"token": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"}' localhost:4000/v1/users/activated
+PUT localhost:4000/v1/users/activated
+Content-Type: application/x-www-form-urlencoded
+
+{"token": "ABCDEFGHIJKLMNOPQRSTUVWXYZ"}
+
+###
+
+# curl -X PUT -d '{"token": "P4B3URJZJ2NW5UPZC2OHN4H2NM"}' localhost:4000/v1/users/activated
+PUT localhost:4000/v1/users/activated
+Content-Type: application/x-www-form-urlencoded
+
+{"token": "IG2ZLXZUGKFHDKI4TXR7B5A7VQ"}
+
+###
+
 # curl -d '{"name": "Faith Smith", "email": "faith@example.com", "password": "pa55word"}' localhost:4000/v1/users
 POST localhost:4000/v1/users
 Content-Type: application/x-www-form-urlencoded
