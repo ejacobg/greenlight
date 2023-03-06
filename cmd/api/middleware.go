@@ -1,10 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"github.com/ejacobg/greenlight/internal/data"
+	"github.com/ejacobg/greenlight/internal/validator"
 	"golang.org/x/time/rate"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -84,6 +88,60 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 		// Manually unlock (as opposed to using defer) so that other goroutines don't have to wait until the response cycle is finished to be able to read.
 		mu.Unlock()
+		next.ServeHTTP(w, r)
+	})
+}
+
+// authenticate will read the Authorization header of the request, extract the authentication token, then attach the appropriate *User for that token.
+// If the Authorization header does not exist, then the data.AnonymousUser value will be attached instead.
+// If the authorization token is invalid, a 401 Unauthorized response will be returned.
+func (app *application) authenticate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Adding the "Vary: Authorization" header tells any caches that this response may vary based on the value of the request's Authorization header.
+		w.Header().Add("Vary", "Authorization")
+
+		// Retrieve the Authorization header from the request. If it doesn't exist, this will return "".
+		authorizationHeader := r.Header.Get("Authorization")
+
+		// If the Authorization header was not given, attach the data.AnonymousUser value.
+		if authorizationHeader == "" {
+			r = app.contextSetUser(r, data.AnonymousUser)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// If the Authorization header was given, confirm that its value is of the form: Bearer <token>
+		headerParts := strings.Split(authorizationHeader, " ")
+		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// Extract the token value.
+		token := headerParts[1]
+
+		// Validate the token value.
+		v := validator.New()
+		if data.ValidateTokenPlaintext(v, token); !v.Valid() {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// Get the user associated with this token. Note that this token is being used for authentication, so set the scope appropriately.
+		user, err := app.models.Users.GetForToken(data.ScopeAuthentication, token)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.invalidAuthenticationTokenResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+			}
+			return
+		}
+
+		// Apply the *User value to the request context.
+		r = app.contextSetUser(r, user)
+
 		next.ServeHTTP(w, r)
 	})
 }

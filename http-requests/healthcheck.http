@@ -1,3 +1,21 @@
+# curl -i -H "Authorization: Bearer XXXXXXXXXXXXXXXXXXXXXXXXXX" localhost:4000/v1/healthcheck
+GET localhost:4000/v1/healthcheck
+Authorization: Bearer XXXXXXXXXXXXXXXXXXXXXXXXXX
+
+###
+
+# curl -i -H "Authorization: INVALID" localhost:4000/v1/healthcheck
+GET localhost:4000/v1/healthcheck
+Authorization: INVALID
+
+###
+
+# curl -H "Authorization: Bearer O26I45IS4XHIE2DMWDAEWCJD3U" localhost:4000/v1/healthcheck
+GET localhost:4000/v1/healthcheck
+Authorization: Bearer O26I45IS4XHIE2DMWDAEWCJD3U
+
+###
+
 GET http://localhost:4000/v1/healthcheck
 
 ###
