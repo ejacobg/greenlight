@@ -1,3 +1,11 @@
+# curl -d '{"name": "Grace Smith", "email": "grace@example.com", "password": "pa55word"}' localhost:4000/v1/users
+POST localhost:4000/v1/users
+Content-Type: application/x-www-form-urlencoded
+
+{"name": "Grace Smith", "email": "grace@example.com", "password": "pa55word"}
+
+###
+
 # curl -X PUT -d '{"token": "invalid"}' localhost:4000/v1/users/activated
 PUT localhost:4000/v1/users/activated
 Content-Type: application/x-www-form-urlencoded
