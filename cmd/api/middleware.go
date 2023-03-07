@@ -145,3 +145,37 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// requireAuthenticatedUser checks if the user is anonymous. If they are, then a 401 Unauthorized response will be returned.
+func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+
+		if user.IsAnonymous() {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// requireActivatedUser will restrict access to a handler to only those requests that have a valid *User value attached to them.
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract the user from the request context.
+		user := app.contextGetUser(r)
+
+		// The user account must be activated to access this resource.
+		if !user.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
+
+		// Otherwise, this user is valid and activated.
+		next.ServeHTTP(w, r)
+	})
+
+	// Wrapping with requireAuthenticatedUser will ensure that the *User value is non-anonymous.
+	return app.requireAuthenticatedUser(fn)
+}

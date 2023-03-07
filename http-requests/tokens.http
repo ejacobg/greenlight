@@ -1,3 +1,11 @@
+# curl -d '{"email": "faith@example.com", "password": "pa55word"}' localhost:4000/v1/tokens/authentication
+POST localhost:4000/v1/tokens/authentication
+Content-Type: application/x-www-form-urlencoded
+
+{"email": "faith@example.com", "password": "pa55word"}
+
+###
+
 # curl -i -d '{"email": "alice@example.com", "password": "pa55word"}' localhost:4000/v1/tokens/authentication
 POST localhost:4000/v1/tokens/authentication
 Content-Type: application/x-www-form-urlencoded

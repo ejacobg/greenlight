@@ -12,6 +12,7 @@ import (
 
 var ErrDuplicateEmail = errors.New("duplicate email")
 
+// AnonymousUser represents a user that has not logged in to the system.
 var AnonymousUser = &User{}
 
 type User struct {
