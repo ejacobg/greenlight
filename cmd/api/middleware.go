@@ -179,3 +179,30 @@ func (app *application) requireActivatedUser(next http.HandlerFunc) http.Handler
 	// Wrapping with requireAuthenticatedUser will ensure that the *User value is non-anonymous.
 	return app.requireAuthenticatedUser(fn)
 }
+
+// requirePermission will protect access to a handler if the request context's *User value does not have the requisite permissions.
+func (app *application) requirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		// Retrieve the user from the request context.
+		user := app.contextGetUser(r)
+
+		// Get this user's permissions.
+		permissions, err := app.models.Permissions.GetAllForUser(user.ID)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+
+		// If the user does not have the required permission, return 403 Forbidden.
+		if !permissions.Include(code) {
+			app.notPermittedResponse(w, r)
+			return
+		}
+
+		// If the user does have the permission, continue with the next middleware.
+		next.ServeHTTP(w, r)
+	}
+
+	// Only activated users have permissions. If the user is not activated, reject this request.
+	return app.requireActivatedUser(fn)
+}

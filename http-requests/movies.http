@@ -1,14 +1,24 @@
-# Uses faith@example.com's token. Faith should be an activated user.
-# curl -i -H "Authorization: Bearer GPSDSPR6BYDHF7OM5TVIPU2Y4M" localhost:4000/v1/movies/1
-GET localhost:4000/v1/movies/1
-Authorization: Bearer GPSDSPR6BYDHF7OM5TVIPU2Y4M
+# curl -X DELETE -H "Authorization: Bearer {{faith}}" localhost:4000/v1/movies/1
+DELETE localhost:4000/v1/movies/1
+Authorization: Bearer {{faith}}
 
 ###
 
-# Uses alice@example.com's token. Alice should be an inactivated user.
-# curl -i -H "Authorization: Bearer O26I45IS4XHIE2DMWDAEWCJD3U" localhost:4000/v1/movies/1
+# curl -X DELETE -H "Authorization: Bearer {{alice}}" localhost:4000/v1/movies/1
+DELETE localhost:4000/v1/movies/1
+Authorization: Bearer {{alice}}
+
+###
+
+# curl -i -H "Authorization: Bearer {{faith}}" localhost:4000/v1/movies/1
 GET localhost:4000/v1/movies/1
-Authorization: Bearer O26I45IS4XHIE2DMWDAEWCJD3U
+Authorization: Bearer {{faith}}
+
+###
+
+# curl -i -H "Authorization: Bearer {{alice}}" localhost:4000/v1/movies/1
+GET localhost:4000/v1/movies/1
+Authorization: Bearer {{alice}}
 
 ###
 
