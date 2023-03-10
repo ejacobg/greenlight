@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	"github.com/ejacobg/greenlight/internal/data"
 	"github.com/ejacobg/greenlight/internal/jsonlog"
 	"github.com/ejacobg/greenlight/internal/mailer"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -97,6 +99,22 @@ func main() {
 	defer db.Close()
 
 	logger.PrintInfo("database connection pool established", nil)
+
+	// Add the current version number to our debug output.
+	expvar.NewString("version").Set(version)
+
+	// Publish the number of active goroutines.
+	expvar.Publish("goroutines", expvar.Func(func() interface{} {
+		return runtime.NumGoroutine()
+	}))
+	// Publish the database connection pool statistics.
+	expvar.Publish("database", expvar.Func(func() interface{} {
+		return db.Stats()
+	}))
+	// Publish the current Unix timestamp.
+	expvar.Publish("timestamp", expvar.Func(func() interface{} {
+		return time.Now().Unix()
+	}))
 
 	app := &application{
 		config: cfg,
