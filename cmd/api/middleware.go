@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"expvar"
 	"fmt"
 	"github.com/ejacobg/greenlight/internal/data"
 	"github.com/ejacobg/greenlight/internal/validator"
@@ -239,5 +240,32 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 
 		// Call the next handler in the chain.
 		next.ServeHTTP(w, r)
+	})
+}
+
+// metrics will record the number of requests and responses sent, as well as the total time (in microseconds) spent processing requests.
+func (app *application) metrics(next http.Handler) http.Handler {
+	// These expvar variables will be created when this handler is first attached to the middleware chain.
+	totalRequestsReceived := expvar.NewInt("total_requests_received")
+	totalResponsesSent := expvar.NewInt("total_responses_sent")
+	totalProcessingTimeMicroseconds := expvar.NewInt("total_processing_time_μs")
+
+	// This code will run for each request.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Start our timer.
+		start := time.Now()
+
+		// Increment the number of requests received.
+		totalRequestsReceived.Add(1)
+
+		// Process the request.
+		next.ServeHTTP(w, r)
+
+		// When the response cycle is finished, increment the number of responses.
+		totalResponsesSent.Add(1)
+
+		// Measure the time spend processing, then update our metric.
+		duration := time.Since(start).Microseconds()
+		totalProcessingTimeMicroseconds.Add(duration)
 	})
 }
