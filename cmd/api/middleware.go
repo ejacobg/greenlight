@@ -208,11 +208,14 @@ func (app *application) requirePermission(code string, next http.HandlerFunc) ht
 	return app.requireActivatedUser(fn)
 }
 
-// enableCORS will tell the browser to grant all origins the ability to read our responses.
+// enableCORS will tell the browser to grant our trusted origins the ability to read our responses. This method will also respond to any preflight CORS requests.
 func (app *application) enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// This response may change depending on the value of the "Origin" header.
 		w.Header().Add("Vary", "Origin")
+
+		// This response may change depending on if this header is present.
+		w.Header().Add("Vary", "Access-Control-Request-Method")
 
 		// Get the value of the request's Origin header.
 		origin := r.Header.Get("Origin")
@@ -221,6 +224,17 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
 		if origin != "" && slices.Contains(app.config.cors.trustedOrigins, origin) {
 			// If the origin is trusted, then set our CORS header appropriately.
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+
+			// If this is an OPTIONS request with the Origin and Access-Control-Request-Method headers set, then treat this as a preflight request.
+			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+				// We will send the same preflight response headers for all preflight requests.
+				w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, PUT, PATCH, DELETE")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+
+				// End this request with a 200 OK response.
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 		}
 
 		// Call the next handler in the chain.
