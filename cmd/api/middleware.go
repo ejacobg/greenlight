@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ejacobg/greenlight/internal/data"
 	"github.com/ejacobg/greenlight/internal/validator"
+	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
 	"net"
 	"net/http"
@@ -205,4 +206,24 @@ func (app *application) requirePermission(code string, next http.HandlerFunc) ht
 
 	// Only activated users have permissions. If the user is not activated, reject this request.
 	return app.requireActivatedUser(fn)
+}
+
+// enableCORS will tell the browser to grant all origins the ability to read our responses.
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// This response may change depending on the value of the "Origin" header.
+		w.Header().Add("Vary", "Origin")
+
+		// Get the value of the request's Origin header.
+		origin := r.Header.Get("Origin")
+
+		// If the Origin header is present, check to see if it is one of our trusted origins.
+		if origin != "" && slices.Contains(app.config.cors.trustedOrigins, origin) {
+			// If the origin is trusted, then set our CORS header appropriately.
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		}
+
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
+	})
 }
