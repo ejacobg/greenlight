@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"github.com/ejacobg/greenlight/internal/data"
 	"github.com/ejacobg/greenlight/internal/validator"
+	"github.com/felixge/httpsnoop"
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -150,7 +152,7 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 // requireAuthenticatedUser checks if the user is anonymous. If they are, then a 401 Unauthorized response will be returned.
 func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		user := app.contextGetUser(r)
 
 		if user.IsAnonymous() {
@@ -159,7 +161,7 @@ func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.Han
 		}
 
 		next.ServeHTTP(w, r)
-	})
+	}
 }
 
 // requireActivatedUser will restrict access to a handler to only those requests that have a valid *User value attached to them.
@@ -249,23 +251,23 @@ func (app *application) metrics(next http.Handler) http.Handler {
 	totalRequestsReceived := expvar.NewInt("total_requests_received")
 	totalResponsesSent := expvar.NewInt("total_responses_sent")
 	totalProcessingTimeMicroseconds := expvar.NewInt("total_processing_time_μs")
+	totalResponsesSentByStatus := expvar.NewMap("total_responses_sent_by_status") // We will map an HTTP code to the number of times we've responded with it.
 
 	// This code will run for each request.
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Start our timer.
-		start := time.Now()
-
 		// Increment the number of requests received.
 		totalRequestsReceived.Add(1)
 
-		// Process the request.
-		next.ServeHTTP(w, r)
+		// Process the request, recording some metrics while doing so.
+		metrics := httpsnoop.CaptureMetrics(next, w, r)
 
 		// When the response cycle is finished, increment the number of responses.
 		totalResponsesSent.Add(1)
 
-		// Measure the time spend processing, then update our metric.
-		duration := time.Since(start).Microseconds()
-		totalProcessingTimeMicroseconds.Add(duration)
+		// Measure the time spent processing, then update our metric.
+		totalProcessingTimeMicroseconds.Add(metrics.Duration.Microseconds())
+
+		// Grab the status code and increment its counter in the map.
+		totalResponsesSentByStatus.Add(strconv.Itoa(metrics.Code), 1)
 	})
 }
