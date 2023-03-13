@@ -1,3 +1,5 @@
+GET {{hostIP}}:{{port}}/v1/healthcheck
+
 # curl -i -H "Authorization: Bearer XXXXXXXXXXXXXXXXXXXXXXXXXX" localhost:4000/v1/healthcheck
 GET localhost:4000/v1/healthcheck
 Authorization: Bearer XXXXXXXXXXXXXXXXXXXXXXXXXX

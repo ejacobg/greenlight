@@ -25,3 +25,5 @@ tmp/
 .envrc
 
 bin/
+
+http-requests/*.private.env.json
