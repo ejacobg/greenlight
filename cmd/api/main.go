@@ -18,7 +18,11 @@ import (
 	_ "github.com/lib/pq"
 )
 
-const version = "1.0.0"
+var (
+	// buildTime will be populated using the -X linker flag.
+	buildTime string
+	version   string
+)
 
 type config struct {
 	port int
@@ -95,6 +99,7 @@ func main() {
 
 	if *displayVersion {
 		fmt.Printf("Version:\t%s\n", version)
+		fmt.Printf("Build time:\t%s\n", buildTime)
 		os.Exit(0)
 	}
 
