@@ -133,3 +133,70 @@ func (app *application) createPasswordResetTokenHandler(w http.ResponseWriter, r
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+// createActivationTokenHandler will take a user's email in the request body, generate a new activation token for them, then email the token to the user.
+// The workflow here is similar to createPasswordResetTokenHandler and registerUserHandler.
+func (app *application) createActivationTokenHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Email string `json:"email"`
+	}
+
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+	if data.ValidateEmail(v, input.Email); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// Use the given email to find the user. If the associated user does not exist, return an error.
+	user, err := app.models.Users.GetByEmail(input.Email)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			v.AddError("email", "no matching email address found")
+			app.failedValidationResponse(w, r, v.Errors)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// Activated users do not need another activation token.
+	if user.Activated {
+		v.AddError("email", "user has already been activated")
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// Generate the new activation token for the inactivated user.
+	token, err := app.models.Tokens.New(user.ID, 3*24*time.Hour, data.ScopeActivation)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// Email the user with their additional activation token.
+	app.background(func() {
+		data := map[string]interface{}{
+			"activationToken": token.Plaintext,
+		}
+
+		// Use the email stored in the database rather than the one sent in the request.
+		err = app.mailer.Send(user.Email, "token_activation.go.html", data)
+		if err != nil {
+			app.logger.PrintError(err, nil)
+		}
+	})
+
+	// Send a 202 Accepted response and confirmation message to the client.
+	env := envelope{"message": "an email will be sent to you containing activation instructions"}
+	err = app.writeJSON(w, http.StatusAccepted, env, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
