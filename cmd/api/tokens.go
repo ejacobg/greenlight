@@ -67,3 +67,69 @@ func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 		app.serverErrorResponse(w, r, err)
 	}
 }
+
+// createPasswordResetTokenHandler will generate and send a password reset token for a user, given that user's email in the request.
+func (app *application) createPasswordResetTokenHandler(w http.ResponseWriter, r *http.Request) {
+	var input struct {
+		Email string `json:"email"`
+	}
+
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+	if data.ValidateEmail(v, input.Email); !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// Use the given email to find the user. If the associated user does not exist, return an error.
+	user, err := app.models.Users.GetByEmail(input.Email)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			v.AddError("email", "no matching email address found")
+			app.failedValidationResponse(w, r, v.Errors)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	// Only activated users may reset their passwords.
+	if !user.Activated {
+		v.AddError("email", "user account must be activated")
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	// If the user is activated, create a 45-minute password reset token, and associate it with the user.
+	token, err := app.models.Tokens.New(user.ID, 45*time.Minute, data.ScopePasswordReset)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// Send the password reset token via email.
+	app.background(func() {
+		data := map[string]interface{}{
+			"passwordResetToken": token.Plaintext,
+		}
+
+		// Note that we are using the email we have in our database rather than the one sent in the request.
+		err = app.mailer.Send(user.Email, "token_password_reset.go.html", data)
+		if err != nil {
+			app.logger.PrintError(err, nil)
+		}
+	})
+
+	// Send a 202 Accepted response, similar to registerUserHandler.
+	env := envelope{"message": "an email will be sent to you containing password reset instructions"}
+	err = app.writeJSON(w, http.StatusAccepted, env, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
