@@ -51,6 +51,10 @@ type config struct {
 	cors struct {
 		trustedOrigins []string
 	}
+	// JWT settings.
+	jwt struct {
+		secret string
+	}
 }
 
 type application struct {
@@ -92,6 +96,10 @@ func main() {
 		cfg.cors.trustedOrigins = strings.Fields(val)
 		return nil
 	})
+
+	// JWT configuration
+	// If a secret is provided, then the application will use JWTs for authentication. Otherwise, it will default to using stateful tokens.
+	flag.StringVar(&cfg.jwt.secret, "jwt-secret", "", "JWT secret")
 
 	displayVersion := flag.Bool("version", false, "Display version and exit")
 

@@ -4,10 +4,14 @@ import (
 	"errors"
 	"github.com/ejacobg/greenlight/internal/data"
 	"github.com/ejacobg/greenlight/internal/validator"
+	"github.com/pascaldekloe/jwt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
+// createAuthenticationTokenHandler will confirm that the request's email and password match a specific user, and if so, will create and respond with an authentication token.
+// Tokens created through this handler should be authenticated with the authenticate middleware.
 func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		Email    string `json:"email"`
@@ -63,6 +67,80 @@ func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 
 	// Return the token back to the user.
 	err = app.writeJSON(w, http.StatusCreated, envelope{"authentication_token": token}, nil)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+	}
+}
+
+// createJWTHandler is an alternative authentication handler to createAuthenticationTokenHandler. It will create and send JWTs instead of stateful tokens.
+// Tokens created through this handler should be authenticated with the authenticateJWT middleware.
+func (app *application) createJWTHandler(w http.ResponseWriter, r *http.Request) {
+	// This user validation is the same as that in createAuthenticationTokenHandler.
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	err := app.readJSON(w, r, &input)
+	if err != nil {
+		app.badRequestResponse(w, r, err)
+		return
+	}
+
+	v := validator.New()
+	data.ValidateEmail(v, input.Email)
+	data.ValidatePasswordPlaintext(v, input.Password)
+	if !v.Valid() {
+		app.failedValidationResponse(w, r, v.Errors)
+		return
+	}
+
+	user, err := app.models.Users.GetByEmail(input.Email)
+	if err != nil {
+		switch {
+		case errors.Is(err, data.ErrRecordNotFound):
+			app.invalidCredentialsResponse(w, r)
+		default:
+			app.serverErrorResponse(w, r, err)
+		}
+		return
+	}
+
+	match, err := user.Password.Matches(input.Password)
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+	if !match {
+		app.invalidCredentialsResponse(w, r)
+		return
+	}
+
+	// Create a JWT claims struct to hold the information we will encode into our token.
+	var claims jwt.Claims
+
+	// Like our stateful token, we will store the user's ID.
+	// The Subject field is a string, so we have to convert the user ID.
+	claims.Subject = strconv.FormatInt(user.ID, 10)
+
+	// This JWT will be valid for the next 24 hours.
+	claims.Issued = jwt.NewNumericTime(time.Now())
+	claims.NotBefore = jwt.NewNumericTime(time.Now())
+	claims.Expires = jwt.NewNumericTime(time.Now().Add(24 * time.Hour))
+
+	// The Issuer and Audiences should be a unique value for our application.
+	claims.Issuer = "greenlight.ejacobg.com"
+	claims.Audiences = []string{"greenlight.ejacobg.com"}
+
+	// Sign our claims using the JWT secret passed in from the command line.
+	jwtBytes, err := claims.HMACSign(jwt.HS256, []byte(app.config.jwt.secret))
+	if err != nil {
+		app.serverErrorResponse(w, r, err)
+		return
+	}
+
+	// Convert the byte slice to a string and return it in a JSON response.
+	err = app.writeJSON(w, http.StatusCreated, envelope{"authentication_token": string(jwtBytes)}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
 	}

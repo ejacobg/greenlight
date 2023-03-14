@@ -7,6 +7,7 @@ import (
 	"github.com/ejacobg/greenlight/internal/data"
 	"github.com/ejacobg/greenlight/internal/validator"
 	"github.com/felixge/httpsnoop"
+	"github.com/pascaldekloe/jwt"
 	"github.com/tomasen/realip"
 	"golang.org/x/exp/slices"
 	"golang.org/x/time/rate"
@@ -143,6 +144,78 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		// Apply the *User value to the request context.
 		r = app.contextSetUser(r, user)
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+// authenticateJWT functions similarly to authenticate, except it will validate a JWT in the Authorization header instead of a stateful token.
+func (app *application) authenticateJWT(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// This header parsing is the same as that in authenticate.
+		w.Header().Add("Vary", "Authorization")
+
+		authorizationHeader := r.Header.Get("Authorization")
+
+		if authorizationHeader == "" {
+			r = app.contextSetUser(r, data.AnonymousUser)
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		headerParts := strings.Split(authorizationHeader, " ")
+		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		token := headerParts[1]
+
+		// Parse the JWT and extract the claims. If the contents of the JWT do not match the signature, then this call will return an error.
+		claims, err := jwt.HMACCheck([]byte(token), []byte(app.config.jwt.secret))
+		if err != nil {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// Check if the JWT is still valid at this moment in time.
+		if !claims.Valid(time.Now()) {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// Check that the issuer is our application.
+		if claims.Issuer != "greenlight.ejacobg.com" {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// Check that our application is in the expected audiences for the JWT.
+		if !claims.AcceptAudience("greenlight.ejacobg.com") {
+			app.invalidAuthenticationTokenResponse(w, r)
+			return
+		}
+
+		// Convert the user ID from a string back into an int64.
+		userID, err := strconv.ParseInt(claims.Subject, 10, 64)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+
+		// Lookup the user record from the database.
+		user, err := app.models.Users.Get(userID)
+		if err != nil {
+			switch {
+			case errors.Is(err, data.ErrRecordNotFound):
+				app.invalidAuthenticationTokenResponse(w, r)
+			default:
+				app.serverErrorResponse(w, r, err)
+			}
+			return
+		}
+
+		// Add the user record to the request context and continue as normal.
+		r = app.contextSetUser(r, user)
 		next.ServeHTTP(w, r)
 	})
 }

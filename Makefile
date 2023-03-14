@@ -19,10 +19,15 @@ confirm:
 # DEVELOPMENT
 # ==================================================================================== #
 
-## run/api: run the cmd/api application
+## run/api: run the cmd/api application (uses stateful tokens)
 .PHONY: run/api
 run/api:
 	go run ./cmd/api -db-dsn=${GREENLIGHT_DB_DSN}
+
+## run/jwt: run the cmd/api application (uses JWTs)
+.PHONY: run/jwt
+run/jwt:
+	go run ./cmd/api -db-dsn=${GREENLIGHT_DB_DSN} -jwt-secret=${JWT_SECRET}
 
 ## db/psql: connect to the database using psql
 .PHONY: db/psql
